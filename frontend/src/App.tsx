@@ -10,7 +10,6 @@ function App() {
   const [tickets, setTickets] = useState<TicketType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isBooking, setIsBooking] = useState(false);
   const [userId] = useState(generateUserId());
 
   const fetchTickets = async () => {
@@ -34,7 +33,6 @@ function App() {
   }, []);
 
   const handleBook = async (ticketTypeId: string, quantity: number) => {
-    setIsBooking(true);
     try {
       await bookTicket(ticketTypeId, quantity, userId);
       toast.success("Your tickets have been successfully booked!", {
@@ -49,8 +47,6 @@ function App() {
         duration: 4000,
         position: "top-right",
       });
-    } finally {
-      setIsBooking(false);
     }
   };
 
@@ -127,7 +123,6 @@ function App() {
                   key={ticket.id}
                   ticket={ticket}
                   onBook={handleBook}
-                  isBooking={isBooking}
                 />
               ))}
             </div>

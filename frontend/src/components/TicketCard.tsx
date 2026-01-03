@@ -5,24 +5,26 @@ import type { TicketType } from "../types";
 interface TicketCardProps {
   ticket: TicketType;
   onBook: (ticketTypeId: string, quantity: number) => Promise<void>;
-  isBooking: boolean;
 }
 
-export const TicketCard: React.FC<TicketCardProps> = ({
-  ticket,
-  onBook,
-  isBooking,
-}) => {
+export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onBook }) => {
   const [quantity, setQuantity] = useState(1);
   const [isHovered, setIsHovered] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const isSoldOut = ticket.available <= 0;
   const availabilityPercent = (ticket.available / ticket.quantity) * 100;
-  const isLowStock = availabilityPercent < 5 && !isSoldOut;
+  const isLowStock = availabilityPercent < 40 && !isSoldOut;
 
-  const handleBook = () => {
-    if (quantity > 0 && quantity <= ticket.available)
-      onBook(ticket.id, quantity);
+  const handleBook = async () => {
+    if (quantity > 0 && quantity <= ticket.available) {
+      setIsProcessing(true);
+      try {
+        await onBook(ticket.id, quantity);
+      } finally {
+        setIsProcessing(false);
+      }
+    }
   };
 
   const tierConfig = {
@@ -65,13 +67,15 @@ export const TicketCard: React.FC<TicketCardProps> = ({
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`absolute -inset-0.5 rounded-3xl blur opacity-20 transition duration-500 ${config.accent
-          } ${isHovered ? "opacity-40" : "opacity-0"}`}
+        className={`absolute -inset-0.5 rounded-3xl blur opacity-20 transition duration-500 ${
+          config.accent
+        } ${isHovered ? "opacity-40" : "opacity-0"}`}
       ></div>
 
       <div
-        className={`relative h-full flex flex-col glass-panel rounded-3xl overflow-hidden transition-all duration-500 ${isSoldOut ? "opacity-50 grayscale" : "hover:-translate-y-2"
-          }`}
+        className={`relative h-full flex flex-col glass-panel rounded-3xl overflow-hidden transition-all duration-500 ${
+          isSoldOut ? "opacity-50 grayscale" : "hover:-translate-y-2"
+        }`}
       >
         {/* Header Section */}
         <div
@@ -123,8 +127,9 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                 Remaining
               </p>
               <p
-                className={`text-lg font-medium ${isSoldOut ? "text-red-400" : "text-emerald-400"
-                  }`}
+                className={`text-lg font-medium ${
+                  isSoldOut ? "text-red-400" : "text-emerald-400"
+                }`}
               >
                 {ticket.available}
               </p>
@@ -147,7 +152,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
               <div className="flex items-center justify-between gap-4 bg-black/20 rounded-xl p-1 border border-white/10">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                  disabled={isProcessing}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   -
                 </button>
@@ -158,7 +164,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                   onClick={() =>
                     setQuantity(Math.min(ticket.available, quantity + 1))
                   }
-                  className="w-10 h-10 flex items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                  disabled={isProcessing}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   +
                 </button>
@@ -167,16 +174,17 @@ export const TicketCard: React.FC<TicketCardProps> = ({
 
             <button
               onClick={handleBook}
-              disabled={isSoldOut || isBooking}
+              disabled={isSoldOut || isProcessing}
               className={`
                                 relative w-full py-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all duration-300 overflow-hidden
-                                ${isSoldOut
-                  ? "bg-white/5 text-white/20 cursor-not-allowed border border-white/5"
-                  : `bg-white text-black hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-white/5`
-                }
+                                ${
+                                  isSoldOut
+                                    ? "bg-white/5 text-white/20 cursor-not-allowed border border-white/5"
+                                    : `bg-white text-black hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-white/5 cursor-pointer`
+                                }
                             `}
             >
-              {isBooking ? (
+              {isProcessing ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                     <circle
@@ -204,7 +212,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                 </span>
               )}
 
-              {!isSoldOut && !isBooking && (
+              {!isSoldOut && !isProcessing && (
                 <div className="shimmer-effect"></div>
               )}
             </button>

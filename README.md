@@ -77,18 +77,112 @@ The application is built in three layers:
 2. **Backend (API Server)**: Node.js server that handles booking requests and business logic
 3. **Database**: PostgreSQL stores all ticket and booking information
 
-### Preventing Double-Booking
+### Preventing Double-Booking (Race Condition Handling)
 
 **The Challenge**: When two people try to book the last ticket at the exact same time, only one should succeed.
 
-**Our Solution**: We use database-level atomic operations. Here's how it works:
+**Our Solution**: We use **Atomic Database Operations** with conditional updates. This is the industry-standard approach used by Ticketmaster, airlines, and e-commerce platforms.
 
-1. When someone books a ticket, we send a single database command that says: "Reduce available tickets by X, but ONLY if there are at least X tickets available"
-2. The database executes this as one atomic operation (all-or-nothing)
-3. If there aren't enough tickets, the operation fails immediately
-4. This happens at the database level, so it's guaranteed to work correctly even with thousands of simultaneous bookings
+#### How It Works
 
-**Why This Works**: The database ensures that only one operation can modify the ticket count at a time, preventing any possibility of overselling.
+**The Code** (see `backend/src/services/booking.service.ts`):
+
+```typescript
+// Single atomic operation that prevents race conditions
+const updateResult = await prisma.ticketType.updateMany({
+  where: {
+    id: ticketTypeId,
+    available: { gte: quantity }  // Only update if enough tickets exist
+  },
+  data: {
+    available: { decrement: quantity }  // Atomically reduce count
+  }
+});
+```
+
+#### Race Condition Example
+
+**Scenario**: 1 ticket left, User A and User B both click "Book" simultaneously
+
+**What Happens**:
+1. Both requests reach the database at the same time
+2. Database processes them sequentially (ACID properties)
+3. **User A's request**: 
+   - Check: `available >= 1`? → YES (1 >= 1)
+   - Action: Decrement to 0
+   - Result: ✅ **Success**
+4. **User B's request**:
+   - Check: `available >= 1`? → NO (0 >= 1)
+   - Action: No update performed
+   - Result: ❌ **"Not enough tickets available"**
+
+**Why This Works**:
+- The WHERE clause condition is part of the UPDATE statement itself
+- No separate SELECT then UPDATE (which would have a race condition)
+- PostgreSQL guarantees atomicity through transaction isolation
+- Works correctly even with multiple backend servers
+
+**Testing Double-Booking Prevention**:
+1. Open the app in two browser windows
+2. Reduce tickets to 1 for any tier
+3. Click "Book" on both windows simultaneously
+4. Only one will succeed, the other gets an error
+
+---
+
+### Payment Processing (Simulated)
+
+**Important**: This demo uses **simulated payment processing**. No real payment gateways are integrated.
+
+#### How Payment Simulation Works
+
+The booking flow includes a payment step (see `backend/src/controllers/booking.controller.ts`):
+
+1. **Calculate Total**: `price × quantity`
+2. **Process Payment** (simulated):
+   - 95% success rate (realistic for payment gateways)
+   - Random delay of 100-500ms (simulates network)
+   - Generates fake transaction ID on success
+3. **Create Booking**: Only if payment succeeds
+4. **Return Result**: Includes booking details and payment confirmation
+
+#### Simulated Payment Responses
+
+**Success** (95% of the time):
+```json
+{
+  "success": true,
+  "booking": { ... },
+  "payment": {
+    "transactionId": "txn_1234567890_abc123",
+    "amount": 100,
+    "currency": "USD"
+  }
+}
+```
+
+**Failure** (5% of the time):
+```json
+{
+  "error": "Payment failed: Insufficient funds"
+}
+```
+
+Possible simulated errors:
+- "Insufficient funds"
+- "Card declined"
+- "Payment gateway timeout"
+- "Invalid card details"
+
+#### In Production
+
+For a real application, you would integrate with:
+- **International**: Stripe, PayPal, Square
+- **Nepal**: Khalti, eSewa
+- **India**: Razorpay
+- **General**: Braintree, Adyen
+
+The payment simulation can be easily replaced with actual payment gateway API calls without changing the booking logic.
 
 ---
 

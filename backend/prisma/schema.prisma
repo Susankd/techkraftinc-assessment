@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+
+model TicketType {
+  id        String    @id @default(uuid())
+  name      String
+  price     Int
+  quantity  Int
+  available Int
+  version   Int       @default(0)
+  bookings  Booking[]
+}
+
+model Booking {
+  id           String     @id @default(uuid())
+  ticketTypeId String
+  userId       String
+  quantity     Int
+  createdAt    DateTime   @default(now())
+  ticketType   TicketType @relation(fields: [ticketTypeId], references: [id])
+}
